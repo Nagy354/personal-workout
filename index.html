@@ -104,7 +104,7 @@ const KEY='sportacus:state', TOTAL_DAYS=63;
 
 const PHASE1=[['Knee push-ups','2 × 8',0],['Bodyweight squats','2 × 12',0],['Reverse snow angels','2 × 10',0],
   ['Plank','2 × 20 sec',20],['Grip trainer','3 × 12 / hand',0]];
-const PHASE2=[['Push-ups','3 sets',0],['Split squats','3 × 10 / leg',0],['Reverse snow angels','3 × 12',0],
+const PHASE2=[['Push-ups','2 short of failure',0],['Split squats','3 × 10 / leg',0],['Reverse snow angels','3 × 12',0],
   ['Single-leg glute bridge','2 × 12 / leg',0],['Hollow body hold','3 × 30 sec',30],['Side plank','2 × 30 sec / side',30],['Grip trainer','3 × 12 / hand',0]];
 const LADDER=['Knee push-ups','Negatives — lower as slowly as you can','Full push-ups',
   'Full push-ups, 3-second lowering','Full push-ups, 2-second pause at the bottom','Diamond push-ups','Archer push-ups'];
@@ -128,7 +128,7 @@ const stepsOf=d=>{const w=weekOf(d); return w<=1?5000:w===2?6500:8000;};
 const typeOf=d=>{const n=parse(d).getDay(); return n===0?'rest':(n%2===0?'strength':'walk');};
 const plan=d=>phaseOf(d)===1?PHASE1:PHASE2;
 const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
-const fresh=()=>({start:today(),log:{},weights:[],rung:1,phaseOverride:null});
+const fresh=()=>({start:today(),log:{},weights:[],rung:1,phaseOverride:null,startWeight:null});
 
 async function load(){ try{ const v=await store.get(KEY); S=v?JSON.parse(v):fresh(); if(!S||!S.start) S=fresh(); }catch(e){ S=fresh(); } }
 async function save(){ try{ saveError=!(await store.set(KEY,JSON.stringify(S))); }catch(e){ saveError=true; } if(tab!=='timer') render(); }
@@ -277,7 +277,10 @@ function weighIn(){
   return `<div class="card"><h2>Weekly weigh-in</h2>
     <p>Morning, after the bathroom, before eating.${last?` Last: ${last.kg} kg.`:''}</p>
     <input type="number" step="0.1" inputmode="decimal" id="wkg" placeholder="kg">
-    <button class="btn ghost" data-act="weigh">Save weight</button></div>`;
+    <button class="btn ghost" data-act="weigh">Save weight</button>
+    <p class="sub" style="margin-top:14px">Starting weight (day 1), if different from your first log: ${S.startWeight!=null?S.startWeight+' kg':'not set'}</p>
+    <input type="number" step="0.1" inputmode="decimal" id="wstart" placeholder="starting kg">
+    <button class="btn ghost" data-act="setstart">Set starting weight</button></div>`;
 }
 
 function stepsRow(t,e){
@@ -362,7 +365,7 @@ function progressView(){
     return `<div class="cell ${cellClass(d)}${d===today()?' today':''}"></div>`;
   }).join('');
   const left=TOTAL_DAYS-daysFrom(S.start,today())-1;
-  const w=S.weights, lost=w.length>1?(w[0].kg-w[w.length-1].kg).toFixed(1):null;
+  const w=S.weights, base=S.startWeight!=null?S.startWeight:(w[0]&&w[0].kg), lost=(base!=null&&w.length)?(base-w[w.length-1].kg).toFixed(1):null;
 
   let h=`<h1>Progress</h1><p class="sub">${left>0?`${left} days until the ceremony`:'Ceremony week'}</p>
     <div class="stats">
@@ -378,7 +381,13 @@ function progressView(){
     return `<div class="rung ${cls}"><span class="n">${n}</span><span>${esc(step)}</span></div>`;
   }).join('');
   if(S.rung<7) h+=`<button class="btn ghost" data-act="rungup">I've earned the next rung</button>`;
-  h+=`</div>`+weighIn();
+  h+=`</div>`;
+
+  const ph=phaseOf(t);
+  h+=`<div class="card"><h2>Phase ${ph}</h2>
+    <p>${ph===1?"Four exercises, easing in.":"Six exercises, the full session."} Switches automatically at week 4, or move early if a full week goes by with no soreness and Lite feels done.</p>
+    <button class="btn ghost" data-act="phase${ph===1?2:1}">Switch to Phase ${ph===1?2:1}</button></div>`;
+  h+=weighIn();
   if(w.length) h+=`<div class="wlist">`+w.slice().reverse().map(e=>
     `<div class="wrow"><span>${parse(e.date).toLocaleDateString(undefined,{day:'numeric',month:'short'})}</span><b>${e.kg} kg</b></div>`).join('')+`</div>`;
   return h+backupCard();
@@ -437,7 +446,7 @@ document.addEventListener('click', async ev=>{
     try{ data=JSON.parse(raw); }catch(e){ notice="That isn't a valid backup. Copy the whole thing, including the brackets."; return render(); }
     if(!data||!data.start||!data.log){ notice="That isn't a valid backup."; return render(); }
     if(!confirm('Replace your current log with this backup? Your current log will be gone.')) return;
-    S={start:data.start, log:data.log||{}, weights:data.weights||[], rung:data.rung||1, phaseOverride:data.phaseOverride||null};
+    S={start:data.start, log:data.log||{}, weights:data.weights||[], rung:data.rung||1, phaseOverride:data.phaseOverride||null, startWeight:data.startWeight||null};
     notice='Restored.';
     return save();
   }
@@ -450,7 +459,15 @@ document.addEventListener('click', async ev=>{
   if(act==='walked'){ S.log[t]={type:'walk',mode:'full'}; return save(); }
   if(act==='dayoff'){ S.log[t]={type:typeOf(t),mode:'off'}; tab='today'; return save(); }
   if(act==='didfloor'){ S.log[t]={type:typeOf(t),mode:'floor'}; tab='today'; return save(); }
+  if(act==='phase2'){ S.phaseOverride=2; return save(); }
+  if(act==='phase1'){ S.phaseOverride=null; return save(); }
   if(act==='rungup'){ S.rung=Math.min(7,S.rung+1); return save(); }
+  if(act==='setstart'){
+    const inp=document.getElementById('wstart'), kg=parseFloat(inp&&inp.value);
+    if(!kg||kg<30||kg>250){ inp&&inp.focus(); return; }
+    S.startWeight=Math.round(kg*10)/10;
+    return save();
+  }
   if(act==='weigh'){
     const inp=document.getElementById('wkg'), kg=parseFloat(inp&&inp.value);
     if(!kg||kg<30||kg>250){ inp&&inp.focus(); return; }
