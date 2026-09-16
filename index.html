@@ -383,7 +383,7 @@ function progressView(){
   if(S.rung<7) h+=`<button class="btn ghost" data-act="rungup">I've earned the next rung</button>`;
   h+=`</div>`;
 
-  const ph=phaseOf(t);
+  const ph=phaseOf(today());
   h+=`<div class="card"><h2>Phase ${ph}</h2>
     <p>${ph===1?"Four exercises, easing in.":"Six exercises, the full session."} Switches automatically at week 4, or move early if a full week goes by with no soreness and Lite feels done.</p>
     <button class="btn ghost" data-act="phase${ph===1?2:1}">Switch to Phase ${ph===1?2:1}</button></div>`;
