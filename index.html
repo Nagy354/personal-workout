@@ -103,9 +103,9 @@
 const KEY='sportacus:state', TOTAL_DAYS=63;
 
 const PHASE1=[['Knee push-ups','2 × 8',0],['Bodyweight squats','2 × 12',0],['Reverse snow angels','2 × 10',0],
-  ['Plank','2 × 20 sec',20],['Grip trainer','3 × 12 / hand',0]];
-const PHASE2=[['Push-ups','2 short of failure',0],['Split squats','3 × 10 / leg',0],['Reverse snow angels','3 × 12',0],
-  ['Single-leg glute bridge','2 × 12 / leg',0],['Hollow body hold','3 × 30 sec',30],['Side plank','2 × 30 sec / side',30],['Grip trainer','3 × 12 / hand',0]];
+  ['Plank','2 × 20 sec',20]];
+const PHASE2=[['Push-ups','2 short of failure',0],['Bodyweight squats','3 × 15',0],['Reverse snow angels','3 × 12',0],
+  ['Single-leg glute bridge','2 × 12 / leg',0],['Hollow body hold','3 × 30 sec',30],['Side plank (forearm)','2 × 15 sec / side',15]];
 const LADDER=['Knee push-ups','Negatives — lower as slowly as you can','Full push-ups',
   'Full push-ups, 3-second lowering','Full push-ups, 2-second pause at the bottom','Diamond push-ups','Archer push-ups'];
 
@@ -138,7 +138,7 @@ function streak(){
   for(;;){
     const e=S.log[d];
     if(e&&e.mode) n++;
-    else if(typeOf(d)==='rest'){}
+    else if(typeOf(d)==='rest'){ n++; }
     else if(d===today()){}
     else break;
     d=shift(d,-1);
@@ -289,6 +289,12 @@ function stepsRow(t,e){
       <span class="box">✓</span><span class="name">Walk ${stepsOf(t).toLocaleString()} steps</span><span class="reps">every day</span>
     </button></div>`;
 }
+function gripRow(e){
+  return `<div class="row">
+    <button class="ex" data-act="grip" aria-pressed="${!!e.grip}">
+      <span class="box">✓</span><span class="name">Grip trainer</span><span class="reps">3 × 12 / hand</span>
+    </button></div>`;
+}
 
 function backupCard(){
   return `<div class="card"><h2>Backup</h2>
@@ -316,14 +322,16 @@ function todayView(){
     h+=`<div class="card done"><span class="big">Session logged</span>
       <p>${type==='walk'?'Steps in the bank.':'Six exercises, done.'} Next one is ${parse(shift(t,1)).toLocaleDateString(undefined,{weekday:'long'})}.</p></div>`;
     if(type!=='walk') h+=stepsRow(t,e);
+    if(type==='walk') h+=gripRow(e);
   } else if(type==='rest'){
     h+=`<div class="card"><h2>No mat work today</h2>
       <p>Sunday rests your muscles, not your legs. Walking is still on — it doesn't interfere with recovery. Weigh in first, before you head out.</p></div>`
       +weighIn()+stepsRow(t,e);
   } else if(type==='walk'){
     h+=`<div class="card"><h2>${stepsOf(t).toLocaleString()} steps</h2>
-      <p>Outside, one walk or two. Roughly ${Math.round(stepsOf(t)/125)} minutes of actual walking.</p></div>
-      <button class="btn" data-act="walked">I walked</button>
+      <p>Outside, one walk or two. Roughly ${Math.round(stepsOf(t)/125)} minutes of actual walking. Grip trainer after, not before — fresh legs for the walk, fresh hands for the grip.</p></div>`;
+    h+=gripRow(e);
+    h+=`<button class="btn" data-act="walked">I walked</button>
       <button class="quiet" data-act="floor">Not feeling it today</button>`;
   } else {
     const done=e.done||[];
@@ -455,8 +463,13 @@ document.addEventListener('click', async ev=>{
     e.walked=!e.walked;
     return save();
   }
+  if(act==='grip'){
+    const e=S.log[t]||(S.log[t]={type:typeOf(t),done:[]});
+    e.grip=!e.grip;
+    return save();
+  }
   if(act==='finish'){ S.log[t]={...(S.log[t]||{}),type:typeOf(t),mode:'full'}; return save(); }
-  if(act==='walked'){ S.log[t]={type:'walk',mode:'full'}; return save(); }
+  if(act==='walked'){ S.log[t]={...(S.log[t]||{}),type:'walk',mode:'full'}; return save(); }
   if(act==='dayoff'){ S.log[t]={type:typeOf(t),mode:'off'}; tab='today'; return save(); }
   if(act==='didfloor'){ S.log[t]={type:typeOf(t),mode:'floor'}; tab='today'; return save(); }
   if(act==='phase2'){ S.phaseOverride=2; return save(); }
