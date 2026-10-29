@@ -100,7 +100,7 @@
 <div id="app"><p class="sub">Opening your log…</p></div>
 
 <script>
-const KEY='sportacus:state', TOTAL_DAYS=63;
+const KEY='sportacus:state', CEREMONY='2026-11-11';
 
 const PHASE1=[['Knee push-ups','2 × 8',0],['Bodyweight squats','2 × 12',0],['Reverse snow angels','2 × 10',0],
   ['Plank','2 × 20 sec',20]];
@@ -310,7 +310,7 @@ function todayView(){
   const label=parse(t).toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'short'});
   const title=type==='strength'?'Strength':type==='walk'?'Walk':'Rest day';
   let h=`<p class="date">${label}</p><h1>${title}</h1>
-    <p class="sub">Phase ${phaseOf(t)}, week ${week} of 9 &nbsp;·&nbsp; ${stepsOf(t).toLocaleString()} steps today</p>`;
+    <p class="sub">Phase ${phaseOf(t)}, week ${week} of ${Math.floor(daysFrom(S.start,CEREMONY)/7)+1} &nbsp;·&nbsp; ${stepsOf(t).toLocaleString()} steps today</p>`;
 
   if(e.mode==='off'){
     h+=`<div class="card done"><span class="big">Day off</span>
@@ -320,7 +320,7 @@ function todayView(){
       <p>You showed up on a day you didn't want to. That's the whole point of the floor. Streak intact.</p></div>`;
   } else if(e.mode){
     h+=`<div class="card done"><span class="big">Session logged</span>
-      <p>${type==='walk'?'Steps in the bank.':'Six exercises, done.'} Next one is ${parse(shift(t,1)).toLocaleDateString(undefined,{weekday:'long'})}.</p></div>`;
+      <p>${type==='walk'?'Steps in the bank.':'Strength session done.'} Next one is ${parse(shift(t,1)).toLocaleDateString(undefined,{weekday:'long'})}.</p></div>`;
     if(type!=='walk') h+=stepsRow(t,e);
     if(type==='walk') h+=gripRow(e);
   } else if(type==='rest'){
@@ -347,6 +347,8 @@ function todayView(){
       <button class="quiet" data-act="rest90">Rest timer, 90 seconds</button>
       <button class="quiet" data-act="floor">Not feeling it today</button>`;
   }
+  if(e.mode==='off') h+=`<button class="btn ghost" data-act="offtofloor">I actually did the floor</button>`;
+  if(e.mode) h+=`<button class="quiet" data-act="undo">Undo today's log</button>`;
   return h;
 }
 
@@ -368,11 +370,11 @@ function floorView(){
 }
 
 function progressView(){
-  const cells=Array.from({length:TOTAL_DAYS},(_,i)=>{
+  const cells=Array.from({length:daysFrom(S.start,CEREMONY)+1},(_,i)=>{
     const d=shift(S.start,i);
     return `<div class="cell ${cellClass(d)}${d===today()?' today':''}"></div>`;
   }).join('');
-  const left=TOTAL_DAYS-daysFrom(S.start,today())-1;
+  const left=daysFrom(today(),CEREMONY);
   const w=S.weights, base=S.startWeight!=null?S.startWeight:(w[0]&&w[0].kg), lost=(base!=null&&w.length)?(base-w[w.length-1].kg).toFixed(1):null;
 
   let h=`<h1>Progress</h1><p class="sub">${left>0?`${left} days until the ceremony`:'Ceremony week'}</p>
@@ -470,6 +472,8 @@ document.addEventListener('click', async ev=>{
   }
   if(act==='finish'){ S.log[t]={...(S.log[t]||{}),type:typeOf(t),mode:'full'}; return save(); }
   if(act==='walked'){ S.log[t]={...(S.log[t]||{}),type:'walk',mode:'full'}; return save(); }
+  if(act==='undo'){ const e=S.log[t]; if(e){ delete e.mode; } return save(); }
+  if(act==='offtofloor'){ S.log[t]={...(S.log[t]||{}),type:typeOf(t),mode:'floor'}; return save(); }
   if(act==='dayoff'){ S.log[t]={type:typeOf(t),mode:'off'}; tab='today'; return save(); }
   if(act==='didfloor'){ S.log[t]={type:typeOf(t),mode:'floor'}; tab='today'; return save(); }
   if(act==='phase2'){ S.phaseOverride=2; return save(); }
